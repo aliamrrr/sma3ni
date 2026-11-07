@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="fr" dir="ltr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sma3ni · سمعني</title>
+  <meta name="description" content="Envoyez votre demande à l'administration par note vocale, en darija.">
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Mono&family=Geist:wght@400;500;600&family=Libre+Baskerville:ital@0;1&family=Noto+Kufi+Arabic:wght@400;500&family=Noto+Naskh+Arabic:wght@400;500&display=swap">
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/citizen.js" defer></script>
+</head>
+<body>
+<div class="page">
+  <header class="aside">
+    <a class="brand" href="/" aria-label="Sma3ni">
+      <svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><g fill="currentColor"><rect x="7" y="7" width="18" height="18"/><rect x="7" y="7" width="18" height="18" transform="rotate(45 16 16)"/></g></svg>
+      <span class="names"><span class="lat">Sma3ni</span><span class="ar">سمعني</span></span>
+    </a>
+    <nav class="nav" aria-label="Navigation">
+      <a href="#envoyer" aria-current="true" data-i18n="nav_send">Envoyer</a>
+      <a href="#suivre" data-i18n="nav_track">Suivre</a>
+      <a href="/agent" data-i18n="nav_agent">Espace agent</a>
+    </nav>
+    <div class="aside-tools">
+      <button class="pill" id="lang" type="button" lang="ar">العربية</button>
+    </div>
+  </header>
+
+  <main class="main">
+    <h1 class="hero" data-i18n-html="hero">Dites-le en darija.<br>On le transmet au <em>bon service</em>.</h1>
+    <p class="lede" data-i18n="lede">Une note vocale suffit : pas de formulaire, pas de file d'attente. Vous recevez un code pour suivre votre demande.</p>
+
+    <!-- ── Send ── -->
+    <section id="envoyer">
+      <form id="send-form" novalidate>
+        <div class="section">
+          <div class="section-head"><span class="n">01</span><h2 data-i18n="s1">Votre message</h2></div>
+
+          <div class="recorder">
+            <button class="rec-btn" id="rec" type="button" data-state="idle" aria-label="Enregistrer">
+              <svg id="ico-mic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg>
+              <svg id="ico-stop" viewBox="0 0 24 24" aria-hidden="true" hidden><rect x="7" y="7" width="10" height="10" rx="1.5" fill="currentColor"/></svg>
+            </button>
+            <div class="rec-side">
+              <div class="rec-status">
+                <span class="label" id="rec-hint" data-i18n="hint_idle">Appuyez et parlez, 3 minutes maximum</span>
+                <span class="mono" id="rec-time">00:00</span>
+              </div>
+              <div class="levels" id="levels" aria-hidden="true"></div>
+            </div>
+          </div>
+
+          <div class="preview" id="preview" hidden>
+            <audio id="player" controls preload="metadata"></audio>
+            <button class="link" id="retake" type="button" data-i18n="retake">Recommencer</button>
+          </div>
+
+          <p class="alt-row">
+            <label class="link" for="file" data-i18n="upload">ou importer un fichier audio</label>
+            <input class="sr-only" id="file" type="file" accept="audio/*">
+          </p>
+        </div>
+
+        <div class="section">
+          <div class="section-head"><span class="n">02</span><h2><span data-i18n="s2">Pour vous recontacter</span> <span class="opt" data-i18n="optional">(optionnel)</span></h2></div>
+          <div class="fields">
+            <label class="field">
+              <span data-i18n="phone">Téléphone</span>
+              <input class="input" id="contact" name="contact" type="tel" inputmode="tel" autocomplete="tel" maxlength="20" placeholder="06 12 34 56 78" dir="ltr">
+            </label>
+            <label class="field">
+              <span data-i18n="region">Région</span>
+              <select class="select" id="region" name="region"></select>
+            </label>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-head"><span class="n">03</span><h2 data-i18n="s3">Consentement</h2></div>
+          <label class="check">
+            <input type="checkbox" id="consent">
+            <span data-i18n="consent">J'accepte que ma note vocale soit transcrite et transmise au service concerné. L'audio est supprimé après 7 jours, mon numéro est chiffré.</span>
+          </label>
+        </div>
+
+        <div class="submit-row">
+          <button class="btn primary" id="submit" type="submit" disabled>
+            <span data-i18n="submit">Envoyer la demande</span><span class="arrow" aria-hidden="true">→</span>
+          </button>
+          <p class="notice" id="send-error" role="alert"></p>
+        </div>
+      </form>
+
+      <div id="sent" class="section" hidden>
+        <div class="section-head"><span class="n">✓</span><h2 data-i18n="sent_label">Demande envoyée</h2></div>
+        <p class="done-head" data-i18n="sent_title">C'est envoyé.</p>
+        <div class="code-box">
+          <span class="code" id="sent-code"></span>
+          <button class="btn sm" id="copy" type="button" data-i18n="copy">Copier</button>
+        </div>
+        <p class="label" data-i18n="keep_code">Gardez ce code : il permet de suivre votre demande ci-dessous.</p>
+        <div class="submit-row">
+          <button class="btn" id="again" type="button" data-i18n="again">Nouvelle demande</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Track ── -->
+    <section id="suivre" class="section">
+      <div class="section-head"><span class="n">04</span><h2 data-i18n="s4">Suivre une demande</h2></div>
+      <form class="track-form" id="track-form" novalidate>
+        <label class="field">
+          <span data-i18n="code_label">Code de suivi</span>
+          <input class="input" id="track-code" autocomplete="off" spellcheck="false" maxlength="14" placeholder="SM-XXXXX-XXXXX">
+        </label>
+        <button class="btn" type="submit"><span data-i18n="track_btn">Suivre</span><span class="arrow" aria-hidden="true">→</span></button>
+      </form>
+      <ul class="recent" id="recent" hidden></ul>
+      <p class="notice" id="track-error" role="alert"></p>
+
+      <div class="track-result" id="track-result" hidden aria-live="polite">
+        <span class="mono" id="tr-code"></span>
+        <ol class="timeline" id="timeline"></ol>
+        <div class="track-meta">
+          <div class="cell"><span class="label" data-i18n="service_label">Service en charge</span><div id="tr-service">—</div></div>
+          <div class="cell"><span class="label" data-i18n="updated_label">Mise à jour</span><div id="tr-updated">—</div></div>
+        </div>
+      </div>
+    </section>
+
+    <div class="meta-grid">
+      <div class="cell"><span class="label" data-i18n="m1k">Langues</span><span data-i18n="m1v">Darija, hassaniya, arabe, avec du français</span></div>
+      <div class="cell"><span class="label" data-i18n="m2k">Délai</span><span data-i18n="m2v">Analyse en quelques minutes</span></div>
+      <div class="cell"><span class="label" data-i18n="m3k">Vos données</span><span data-i18n="m3v">Audio supprimé après 7 jours, numéro chiffré</span></div>
+    </div>
+
+    <footer class="footer">
+      <span data-i18n-html="footer">Ce n'est pas un service d'urgence. Urgences : <strong>15 · 19 · 150</strong></span>
+      <span>Sma3ni</span>
+    </footer>
+  </main>
+</div>
+</body>
+</html>

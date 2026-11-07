@@ -1,0 +1,7 @@
+# Copy to terraform.tfvars (git-ignored) and adjust.
+region        = "eu-west-3"
+instance_type = "g6.2xlarge"
+
+# SSH stays closed by default; use: aws ssm start-session --target <instance_id>
+# ssh_cidrs = ["203.0.113.10/32"]
+# key_name  = "my-keypair"

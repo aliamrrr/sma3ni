@@ -1,0 +1,30 @@
+[project]
+name = "sma3ni"
+version = "1.0.0"
+description = "Voice-first citizen request desk in Moroccan Darija: speech-to-text, dialect identification and routing."
+readme = "README.md"
+requires-python = ">=3.12"
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+extend-exclude = ["docs/diagram"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "S", "BLE", "SIM"]
+ignore = [
+    "S101",   # assert in tests
+    "S104",   # binding 0.0.0.0 inside containers is intended
+    "S603",   # subprocess with a fixed argv (ffmpeg, browser)
+    "S607",
+    "B008",   # FastAPI Depends()/File() in defaults is the framework idiom
+    "E702",   # compact `clauses.append(...); params.append(...)` in the query builder
+    "SIM105", # explicit try/except/pass reads fine for a single expected exception
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

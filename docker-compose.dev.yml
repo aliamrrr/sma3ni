@@ -1,0 +1,23 @@
+# Laptop mode: no models, no ML image (fake ASR + fake LID), API on http://localhost:8000.
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
+services:
+  api:
+    ports: ["127.0.0.1:8000:8000"]
+    environment:
+      EXPOSE_DOCS: "true"
+
+  asr-worker:
+    build: { context: ., dockerfile: docker/core.Dockerfile }
+    image: sma3ni-core:latest
+    environment:
+      ASR_ENGINE: fake
+    deploy:
+      resources: { limits: { memory: 512m } }
+
+  nlp-worker:
+    image: sma3ni-core:latest
+    environment:
+      LID_ENGINE: fake
+
+  caddy:
+    profiles: [prod]

@@ -1,0 +1,9 @@
+-r core.txt
+# torch (CPU build) is installed first in docker/ml.Dockerfile from the PyTorch CPU index.
+transformers>=5.2.0          # VoxtralRealtimeForConditionalGeneration (required by the model card)
+mistral-common[audio]>=1.8
+huggingface_hub
+# LIDstral-Arabic: fastText one-vs-all + PyTorch MLP stacker + sklearn isotonic calibration
+fasttext-wheel>=0.9.2
+numpy>=1.26,<2               # fastText wheels are built against numpy 1.x
+scikit-learn==1.4.0          # LIDstral isotonic calibration is a pickle from this exact version

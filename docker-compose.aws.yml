@@ -1,0 +1,44 @@
+# AWS overlay: ASR on the NVIDIA GPU, voice notes in Amazon S3.
+#   docker compose -f docker-compose.yml -f docker-compose.aws.yml build
+#   docker compose -f docker-compose.yml -f docker-compose.aws.yml run --rm models
+#   docker compose -f docker-compose.yml -f docker-compose.aws.yml up -d
+# Tip: export COMPOSE_FILE=docker-compose.yml:docker-compose.aws.yml in the deploy user's shell.
+#
+# Credentials: none in .env. boto3 picks up the EC2 instance role through IMDSv2
+# (the instance must allow 2 metadata hops so containers can reach it, see deploy/aws).
+#
+# Network: the services that talk to S3 (api, asr-worker, janitor) join the `egress`
+# network. Outbound traffic is then limited by the instance security group (80/443 only)
+# and S3 is reached through the VPC gateway endpoint created by Terraform.
+x-s3-env: &s3-env
+  STORAGE_BACKEND: s3
+
+services:
+  api:
+    environment:
+      <<: *s3-env
+    networks: [edge, backend, egress]
+
+  janitor:
+    environment:
+      <<: *s3-env
+    networks: [backend, egress]
+
+  asr-worker:
+    build:
+      args:
+        TORCH_INDEX: https://download.pytorch.org/whl/cu128
+    environment:
+      <<: *s3-env
+      ASR_DEVICE: cuda
+      ASR_THREADS: "4"
+      NVIDIA_VISIBLE_DEVICES: all
+    networks: [backend, egress]
+    deploy:
+      resources:
+        limits: { memory: "${ASR_MEM_LIMIT:-20g}" }
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]

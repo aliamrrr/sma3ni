@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="fr" dir="ltr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Espace agent · Sma3ni</title>
+  <meta name="robots" content="noindex">
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Mono&family=Geist:wght@400;500;600&family=Libre+Baskerville:ital@0;1&family=Noto+Kufi+Arabic:wght@400;500&family=Noto+Naskh+Arabic:wght@400;500&display=swap">
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/agent.js" defer></script>
+</head>
+<body>
+
+<!-- ── Login ── -->
+<div class="login" id="login" hidden>
+  <form id="login-form" novalidate>
+    <a class="brand" href="/" aria-label="Sma3ni">
+      <svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><g fill="currentColor"><rect x="7" y="7" width="18" height="18"/><rect x="7" y="7" width="18" height="18" transform="rotate(45 16 16)"/></g></svg>
+      <span class="names"><span class="lat">Sma3ni</span><span class="ar">سمعني</span></span>
+    </a>
+    <h1 class="hero">Espace <em>agent</em></h1>
+    <label class="field">
+      <span>Clé d'accès</span>
+      <input class="input" id="key" type="password" autocomplete="current-password" spellcheck="false" placeholder="sk_sma3ni_…" dir="ltr">
+    </label>
+    <div class="submit-row">
+      <button class="btn primary" type="submit">Entrer<span class="arrow" aria-hidden="true">→</span></button>
+      <p class="notice" id="login-error" role="alert"></p>
+    </div>
+    <p class="mono">La clé reste dans cet onglet et disparaît à sa fermeture.</p>
+  </form>
+</div>
+
+<!-- ── Console ── -->
+<div class="console" id="console" data-view="list" hidden>
+  <aside class="c-aside">
+    <a class="brand" href="/" aria-label="Sma3ni">
+      <svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><g fill="currentColor"><rect x="7" y="7" width="18" height="18"/><rect x="7" y="7" width="18" height="18" transform="rotate(45 16 16)"/></g></svg>
+      <span class="names"><span class="lat">Sma3ni</span><span class="ar">سمعني</span></span>
+    </a>
+    <nav class="queues" id="queues" aria-label="Files"></nav>
+    <div class="bottom">
+      <div class="who"><span id="who-name"></span><span class="mono" id="who-service"></span></div>
+    </div>
+    <button class="link" id="logout" type="button">Se déconnecter</button>
+  </aside>
+
+  <section class="c-list" aria-label="Demandes">
+    <div class="c-list-head">
+      <span id="list-title"></span>
+      <span class="mono" id="list-count"></span>
+    </div>
+    <ul class="rows" id="rows" role="listbox" aria-label="Demandes"></ul>
+    <div class="empty-state" id="list-empty" hidden>Aucune demande dans cette file.</div>
+    <div class="submit-row" id="more-row" hidden><button class="btn sm" id="more" type="button">Charger plus</button></div>
+  </section>
+
+  <section class="c-detail" id="detail" aria-live="polite">
+    <div class="empty-state" id="detail-empty">Sélectionnez une demande. Raccourcis : ↑ ↓ pour naviguer.</div>
+    <article id="d" hidden>
+      <div class="d-top">
+        <button class="btn sm back" id="back" type="button">← Liste</button>
+        <span class="mono" id="d-code"></span>
+        <span class="status" id="d-status"></span>
+      </div>
+      <h1 class="d-title" id="d-title"></h1>
+      <div class="d-sub" id="d-sub"></div>
+
+      <div class="transcript" id="d-transcript" lang="ar"></div>
+      <div class="listen" id="d-listen">
+        <button class="btn sm" id="d-play" type="button">Écouter l'audio</button>
+      </div>
+      <div class="chips" id="d-chips"></div>
+
+      <div class="d-grid" id="d-grid"></div>
+
+      <div class="d-actions">
+        <label class="field">
+          <span>Note interne <span class="opt">(optionnel)</span></span>
+          <textarea class="textarea" id="d-note" maxlength="2000" placeholder="Ce qui a été fait, à qui c'est transmis…"></textarea>
+        </label>
+        <div class="row-btns" id="d-buttons"></div>
+        <div class="reassign" id="d-reassign" hidden>
+          <label class="field">
+            <span>Réaffecter à</span>
+            <select class="select" id="d-service"></select>
+          </label>
+          <button class="btn sm" id="d-move" type="button">Réaffecter</button>
+        </div>
+        <p class="notice" id="d-error" role="alert"></p>
+      </div>
+
+      <ol class="history" id="d-history"></ol>
+    </article>
+  </section>
+</div>
+</body>
+</html>

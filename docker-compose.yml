@@ -1,0 +1,229 @@
+# Sma3ni - base stack (single server, CPU, local audio volume).
+#   first time : docker compose build && docker compose run --rm models && docker compose up -d
+#   scale ASR  : docker compose up -d --scale asr-worker=2
+# AWS (GPU + S3): add -f docker-compose.aws.yml, see docs/TECHNIQUE.md.
+name: sma3ni
+
+x-logging: &logging
+  driver: json-file
+  options: { max-size: "10m", max-file: "5" }
+
+# Applied to every container we build: read-only rootfs, no Linux capabilities, no privilege escalation.
+x-hardened: &hardened
+  restart: unless-stopped
+  read_only: true
+  tmpfs: ["/tmp:size=512m"]
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  logging: *logging
+
+x-app-env: &app-env
+  DATABASE_URL: postgresql://sma3ni:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/sma3ni
+  NATS_URL: nats://nats:4222
+  NATS_USER: sma3ni
+  NATS_PASSWORD: ${NATS_PASSWORD:?set NATS_PASSWORD in .env}
+  CONTACT_ENC_KEY: ${CONTACT_ENC_KEY:?set CONTACT_ENC_KEY in .env}
+  STORAGE_BACKEND: ${STORAGE_BACKEND:-local}
+  STORAGE_DIR: /data/audio
+  S3_BUCKET: ${S3_BUCKET:-}
+  S3_PREFIX: ${S3_PREFIX:-audio}
+  S3_SSE: ${S3_SSE:-aws:kms}
+  S3_KMS_KEY_ID: ${S3_KMS_KEY_ID:-}
+  S3_ENDPOINT_URL: ${S3_ENDPOINT_URL:-}
+  AWS_REGION: ${AWS_REGION:-}
+  AUDIO_RETENTION_DAYS: ${AUDIO_RETENTION_DAYS:-7}
+  MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-10}
+  MAX_AUDIO_SECONDS: ${MAX_AUDIO_SECONDS:-180}
+  PUBLIC_HOURLY_LIMIT: ${PUBLIC_HOURLY_LIMIT:-5}
+  LOG_LEVEL: ${LOG_LEVEL:-INFO}
+
+x-ml-env: &ml-env
+  <<: *app-env
+  HF_HOME: /models
+  HF_TOKEN: ${HF_TOKEN:-}
+  ASR_ENGINE: ${ASR_ENGINE:-voxtral}
+  ASR_MODEL_ID: ${ASR_MODEL_ID:-Morocco-MTNRA-Labs/Voxtral-Mini-4B-Realtime-Arabic}
+  ASR_REVISION: ${ASR_REVISION:-}
+  ASR_DTYPE: ${ASR_DTYPE:-bfloat16}
+  ASR_THREADS: ${ASR_THREADS:-8}
+  ASR_DEVICE: ${ASR_DEVICE:-cpu}
+  LID_ENGINE: ${LID_ENGINE:-lidstral}
+  LID_MODEL_ID: ${LID_MODEL_ID:-Morocco-MTNRA-Labs/LIDstral-Arabic}
+  LID_REVISION: ${LID_REVISION:-}
+  LID_MIN_CONFIDENCE: ${LID_MIN_CONFIDENCE:-0.5}
+
+services:
+  # ---------------------------------------------------------------- edge
+  caddy:
+    image: caddy:2.10-alpine
+    restart: unless-stopped
+    ports: ["80:80", "443:443", "443:443/udp"]
+    environment:
+      DOMAIN: ${DOMAIN:-localhost}
+      ACME_EMAIL: ${ACME_EMAIL:-admin@example.com}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    read_only: true
+    tmpfs: ["/tmp"]
+    cap_drop: [ALL]
+    cap_add: [NET_BIND_SERVICE]
+    security_opt: ["no-new-privileges:true"]
+    logging: *logging
+    networks: [edge]
+    depends_on:
+      api: { condition: service_healthy }
+
+  api:
+    <<: *hardened
+    build: { context: ., dockerfile: docker/core.Dockerfile }
+    image: sma3ni-core:latest
+    command: >
+      uvicorn sma3ni.api.app:app --host 0.0.0.0 --port 8000 --workers ${API_WORKERS:-2}
+      --proxy-headers --forwarded-allow-ips=* --no-server-header --timeout-graceful-shutdown 20
+    environment:
+      <<: *app-env
+      EXPOSE_DOCS: ${EXPOSE_DOCS:-false}
+    volumes: [audio:/data/audio]
+    networks: [edge, backend]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/readyz', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+    deploy:
+      resources: { limits: { cpus: "2", memory: 1g } }
+
+  # ---------------------------------------------------------------- event pipeline
+  relay:
+    <<: *hardened
+    image: sma3ni-core:latest
+    command: python -m sma3ni.relay
+    environment: *app-env
+    networks: [backend]
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      nats: { condition: service_healthy }
+    deploy:
+      resources: { limits: { cpus: "0.5", memory: 256m } }
+
+  asr-worker:
+    <<: *hardened
+    build: { context: ., dockerfile: docker/ml.Dockerfile }
+    image: sma3ni-ml:latest
+    command: python -m sma3ni.workers.asr
+    environment:
+      <<: *ml-env
+      HF_HUB_OFFLINE: "1"
+    volumes: [audio:/data/audio, models:/models]
+    networks: [backend]  # internal network: no internet access at runtime
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      nats: { condition: service_healthy }
+    stop_grace_period: 5m   # let the current transcription finish
+    deploy:
+      resources: { limits: { memory: "${ASR_MEM_LIMIT:-14g}" } }
+
+  nlp-worker:
+    <<: *hardened
+    image: sma3ni-ml:latest
+    command: python -m sma3ni.workers.nlp
+    environment:
+      <<: *ml-env
+      HF_HUB_OFFLINE: "1"
+    volumes: [models:/models]
+    networks: [backend]
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      nats: { condition: service_healthy }
+    deploy:
+      resources: { limits: { cpus: "1", memory: 1g } }
+
+  janitor:
+    <<: *hardened
+    image: sma3ni-core:latest
+    command: python -m sma3ni.janitor
+    environment: *app-env
+    volumes: [audio:/data/audio]
+    networks: [backend]
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+    deploy:
+      resources: { limits: { cpus: "0.25", memory: 128m } }
+
+  # ---------------------------------------------------------------- one-shot jobs
+  migrate:
+    <<: *hardened
+    image: sma3ni-core:latest
+    command: python -m sma3ni.migrate
+    restart: "no"
+    environment: *app-env
+    networks: [backend]
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  models:  # docker compose run --rm models   (once, then after each model change)
+    <<: *hardened
+    image: sma3ni-ml:latest
+    command: python -m sma3ni.fetch_models
+    restart: "no"
+    profiles: [setup]
+    environment: *ml-env
+    volumes: [models:/models]
+    networks: [egress]
+
+  # ---------------------------------------------------------------- state
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: sma3ni
+      POSTGRES_DB: sma3ni
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_INITDB_ARGS: "--data-checksums"
+    command: >
+      postgres -c shared_buffers=${PG_SHARED_BUFFERS:-1GB} -c max_connections=200
+      -c log_min_duration_statement=500 -c idle_in_transaction_session_timeout=60000
+    volumes: [pgdata:/var/lib/postgresql/data]
+    shm_size: 256m
+    security_opt: ["no-new-privileges:true"]
+    logging: *logging
+    networks: [backend]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sma3ni -d sma3ni"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  nats:
+    image: nats:2.11-alpine
+    restart: unless-stopped
+    command: ["-js", "-sd", "/data", "-m", "8222", "--user", "sma3ni", "--pass", "${NATS_PASSWORD}"]
+    volumes: [natsdata:/data]
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    logging: *logging
+    networks: [backend]
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:8222/healthz?js-enabled-only=true"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+networks:
+  edge: {}                       # caddy <-> api
+  backend: { internal: true }    # api, workers, postgres, nats: no route to the internet
+  egress: {}                     # only the one-shot models job
+
+volumes:
+  pgdata:
+  natsdata:
+  audio:        # temporary voice notes, purged by the janitor
+  models:       # Hugging Face cache (~9 GB)
+  caddy-data:
+  caddy-config:

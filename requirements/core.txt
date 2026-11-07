@@ -1,0 +1,7 @@
+fastapi>=0.115,<1
+uvicorn[standard]>=0.32,<1
+python-multipart>=0.0.18
+psycopg[binary,pool]>=3.2,<4
+nats-py>=2.9,<3
+cryptography>=43
+boto3>=1.35,<2              # S3 audio storage (STORAGE_BACKEND=s3)
