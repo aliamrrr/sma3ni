@@ -3,7 +3,7 @@
 #   GPU (AWS)     : TORCH_INDEX=https://download.pytorch.org/whl/cu128 (set by docker-compose.aws.yml)
 # The CUDA wheels ship their own CUDA runtime; the host only needs the NVIDIA driver and
 # nvidia-container-toolkit (both preinstalled on the AWS Deep Learning Base AMI).
-FROM python:3.12-slim-bookworm
+FROM python:3.15-slim-bookworm
 
 ARG TORCH_INDEX=https://download.pytorch.org/whl/cpu
 
