@@ -1,5 +1,5 @@
 # Light image: api, relay, janitor, migrate, cli (~150 MB). No ML dependencies.
-FROM python:3.12-slim-bookworm
+FROM python:3.15-slim-bookworm
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
